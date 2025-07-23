@@ -1,0 +1,46 @@
+name: EscadiaHax
+main: id.rnggagib.Plugin
+version: 1.0-SNAPSHOT
+api-version: 1.21
+description: A professional anti-cheat plugin with advanced detection capabilities
+author: rnggagib
+depend: [ProtocolLib]
+commands:
+  sus:
+    description: Opens the suspicious players monitoring GUI
+    usage: /sus
+    permission: escadiahax.sus
+  escadiahax:
+    description: Main command for the EscadiaHax plugin
+    usage: /escadiahax [reload|help|version]
+    aliases: [ehax]
+    permission: escadiahax.command
+  replay:
+    description: Manage and view replay sessions of suspicious mining activities
+    usage: /replay [list|view|stop|control|help]
+    permission: escadiahax.replay
+permissions:
+  escadiahax.sus:
+    description: Allows the user to open the suspicious players monitoring GUI
+    default: op
+  escadiahax.notify:
+    description: Allows the user to receive notifications about suspicious activities
+    default: op
+  escadiahax.teleport:
+    description: Allows the user to teleport to suspicious players
+    default: op
+  escadiahax.vanish:
+    description: Allows the user to become invisible to monitor players
+    default: op
+  escadiahax.command:
+    description: Allows the user to use the /escadiahax command
+    default: op
+  escadiahax.admin.reload:
+    description: Allows the user to reload the plugin configuration
+    default: op
+  escadiahax.admin.reset:
+    description: Allows the user to reset checked status of players
+    default: op
+  escadiahax.replay:
+    description: Allows the user to use the replay functionality
+    default: op

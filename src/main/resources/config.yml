@@ -1,0 +1,68 @@
+# EscadiaHax Configuration
+# A professional anti-cheat plugin with advanced detection capabilities
+
+# X-ray detection settings
+xray-detection:
+  # The minimum suspicion score required to trigger a notification
+  min-suspicion-score-for-notification: 50
+  # Weight factors for different detection metrics
+  weights:
+    valuable-ore-ratio: 10
+    suspicious-enchants: 5
+    mining-patterns: 20
+    impossible-enchants: 10
+    direct-mining: 15
+
+# Notification settings
+notifications:
+  # Enable or disable staff notifications
+  enabled: true
+  # Log suspicious activities to console
+  log-to-console: true
+  # Show detailed information in notifications
+  show-details: true
+  # Cooldown between notifications about the same player (in seconds)
+  cooldown-seconds: 60
+  # Notification format
+  # Available placeholders: %player%, %score%
+  format: "§c[EscadiaHax] §fPlayer §e%player% §fis showing suspicious behavior (Score: §c%score%§f)"
+
+# GUI settings
+gui:
+  # Title of the suspicious players GUI
+  title: "§c§lSuspicious Players"
+  # Minimum suspicion score to appear in the GUI
+  min-score: 30
+  # Refresh rate of the GUI (in seconds)
+  refresh-rate: 30
+  # Message shown when a player is marked as checked
+  checked-message: "§a[EscadiaHax] §fMarked §e%player% §fas checked. Removed from suspicious players list."
+  # Message shown when a player's checked status is reset
+  reset-checked-message: "§a[EscadiaHax] §fReset checked status for §e%player%§f."
+
+# Vanish settings
+vanish:
+  # Give night vision effect when vanished
+  night-vision: true
+  # Set player to spectator mode when vanished
+  spectator-mode: true
+
+# Replay mode settings
+replay:
+  # Enable or disable replay functionality
+  enabled: true
+  # Maximum duration of a replay in seconds (strictly enforced)
+  max-duration: 60
+  # Number of mining sessions to record per player
+  max-sessions-per-player: 5
+  # Storage time for replay data in minutes (after this time, old data will be purged)
+  storage-time: 60
+  # Enable debug logging for replay functionality
+  debug-mode: true
+  # Blocks to highlight in replay mode
+  highlight-blocks:
+    - DIAMOND_ORE
+    - DEEPSLATE_DIAMOND_ORE
+    - EMERALD_ORE
+    - DEEPSLATE_EMERALD_ORE
+    - ANCIENT_DEBRIS
