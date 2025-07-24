@@ -12,6 +12,45 @@ xray-detection:
     mining-patterns: 20
     impossible-enchants: 10
     direct-mining: 15
+    unnatural-speed: 15
+  # Advanced detection settings
+  advanced:
+    # Allow higher ratios of valuable ores when mining in natural caves (Y level below this is considered a cave)
+    cave-y-level: 50
+    # Allow higher ratios for players with Fortune enchantment
+    fortune-allowance:
+      enabled: true
+      # Each level of Fortune multiplies the allowable valuable ore ratio by this amount
+      multiplier: 1.5
+    # Environmental context detection
+    context-detection:
+      enabled: true
+      # If a player is near lava/water, they're more likely to be in a cave, so reduce suspicion
+      lava-water-detection-radius: 5
+      # Exposed ore blocks are more likely in caves (multiple sides not surrounded by solid blocks)
+      check-exposed-faces: true
+      # Reduce suspicion if player is mining near other players (cooperative mining)
+      cooperative-mining-radius: 20
+      # Vein detection settings
+      vein-detection:
+        enabled: true
+        # Maximum distance between blocks to be considered part of the same vein
+        max-distance: 3
+      # Mining speed detection
+      speed-detection:
+        enabled: true
+        # Minimum time between block breaks (in milliseconds) to be considered natural
+        min-break-time: 200
+      # Natural cave detection
+      cave-detection:
+        enabled: true
+        # Percentage of air blocks required to consider an area a natural cave
+        air-percentage-threshold: 40
+      # Ore cluster detection 
+      cluster-detection:
+        enabled: true
+        # Minimum number of ore blocks nearby to be considered a natural cluster
+        min-nearby-ores: 1
 
 # Notification settings
 notifications:
