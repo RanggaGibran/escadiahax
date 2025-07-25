@@ -10,6 +10,7 @@ d:\01Escadia\escadiahax\src\main\java\id\rnggagib\model\PlayerData.java
 d:\01Escadia\escadiahax\src\main\java\id\rnggagib\listeners\PlayerListener.java
 d:\01Escadia\escadiahax\src\main\java\id\rnggagib\manager\PlayerDataManager.java
 d:\01Escadia\escadiahax\src\main\java\id\rnggagib\model\MiningSession.java
+d:\01Escadia\escadiahax\src\main\java\id\rnggagib\listeners\ReplayControlListener.java
 d:\01Escadia\escadiahax\src\main\java\id\rnggagib\commands\EscadiaHaxCommand.java
 d:\01Escadia\escadiahax\src\main\java\id\rnggagib\gui\SusGUI.java
 d:\01Escadia\escadiahax\src\main\java\id\rnggagib\commands\SusCommand.java

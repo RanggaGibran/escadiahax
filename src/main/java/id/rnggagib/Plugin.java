@@ -68,6 +68,12 @@ public class Plugin extends JavaPlugin {
             getCommand("replay").setExecutor(new ReplayCommand(this));
         }
         
+        // Register replay control listener if replay is enabled
+        if (this.replayManager != null) {
+            pm.registerEvents(new id.rnggagib.listeners.ReplayControlListener(this), this);
+            LOGGER.info("Registered replay control listener for enhanced replay controls");
+        }
+        
         LOGGER.info("EscadiaHax has been enabled successfully!");
     }
 
@@ -145,11 +151,29 @@ public class Plugin extends JavaPlugin {
     }
     
     /**
+     * Logs a message with the specified level
+     * Only logs if the level is at or below the configured debug level
+     * 
+     * @param message The message to log
+     * @param component The component that's logging (XrayDetector, ReplayManager, etc.)
+     * @param level The debug level (0=essential, 1=important, 2=detailed)
+     */
+    public void logDebug(String message, String component, int level) {
+        // If not in debug mode or level is too high, don't log
+        String configPath = component.toLowerCase() + ".debug.debug-level";
+        int configuredLevel = getConfig().getInt(configPath, 0);
+        
+        if (configuredLevel >= level) {
+            getLogger().info("[" + component + "] " + message);
+        }
+    }
+    
+    /**
      * Check if replay functionality is enabled
      * 
      * @return True if replay is enabled
      */
     public boolean isReplayEnabled() {
-        return replayManager != null;
+        return replayManager != null && getConfig().getBoolean("replay.enabled", true);
     }
 }

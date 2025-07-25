@@ -171,8 +171,23 @@ public class XrayDetector {
         
         // ===== APPLY SUSPICION RULES =====
         
-        // Log detection details for debugging
-        if (plugin.getConfig().getBoolean("replay.debug-mode", false)) {
+        // Calculate the score based on various factors
+        int totalSuspicionScore = 0;
+        List<String> suspicionReasons = new ArrayList<>();
+        
+        // Log detection details only if detailed debug mode is enabled
+        boolean shouldLog = plugin.getConfig().getBoolean("xray-detection.debug.detailed-logging", false) && 
+                    plugin.getConfig().getInt("xray-detection.debug.debug-level", 0) > 0;
+        
+        // If log-only-high-suspicion is true, only log if suspicion is high
+        if (plugin.getConfig().getBoolean("xray-detection.debug.log-only-high-suspicion", true)) {
+            int minScoreToLog = plugin.getConfig().getInt("xray-detection.debug.min-score-to-log", 40);
+            if (playerData.getSuspicionScore() < minScoreToLog) {
+                shouldLog = false;
+            }
+        }
+        
+        if (shouldLog) {
             plugin.getLogger().info(String.format(
                 "[XrayDetector] Player %s: valuable ratio %.2f, adjusted threshold %.2f (fortune %d, " +
                 "cave %b, exposed %d, fluids %b, cooperative %b, vein %b, cluster %b, speed %b, natural %.2f)",
@@ -230,16 +245,9 @@ public class XrayDetector {
                 
                 // Finalize the replay recording if enabled
                 if (plugin.isReplayEnabled()) {
-                    // Get the latest reason
-                    String reason = "Suspicious behavior";
-                    List<String> reasons = playerData.getSuspicionReasons();
-                    if (!reasons.isEmpty()) {
-                        reason = reasons.get(reasons.size() - 1);
-                    }
-                    
                     plugin.getReplayManager().finalizeRecording(
                         player.getUniqueId(), 
-                        reason, 
+                        getLatestReason(playerData), 
                         playerData.getSuspicionScore()
                     );
                 }
@@ -262,10 +270,17 @@ public class XrayDetector {
         String message = plugin.getConfigManager().getFormattedNotification(
                 player.getName(), playerData.getSuspicionScore());
         
-        // Log to console if enabled
+        // Get the latest reason
+        final String latestReason = getLatestReason(playerData);
+        
+        // Log to console if enabled - use a more concise format
         if (plugin.getConfigManager().isLogToConsole()) {
-            plugin.getLogger().info("Suspicious player detected: " + player.getName() + 
-                    " (Score: " + playerData.getSuspicionScore() + ")");
+            // Only log important notifications (not configurable)
+            if (playerData.getSuspicionScore() >= plugin.getConfig().getInt("xray-detection.min-suspicion-score-for-notification", 50)) {
+                plugin.getLogger().info("SUS: " + player.getName() + 
+                        " Score:" + playerData.getSuspicionScore() + 
+                        " - " + latestReason);
+            }
         }
         
         // Send to staff with permission
@@ -276,14 +291,23 @@ public class XrayDetector {
                 
                 // Send details if enabled
                 if (plugin.getConfigManager().isShowDetailsInNotification()) {
-                    // Get the most recent reason
-                    List<String> reasons = playerData.getSuspicionReasons();
-                    if (!reasons.isEmpty()) {
-                        String latestReason = reasons.get(reasons.size() - 1);
-                        staff.sendMessage("§7Latest reason: §c" + latestReason);
-                    }
+                    staff.sendMessage("§7Latest reason: §c" + latestReason);
                 }
             });
+    }
+    
+    /**
+     * Gets the latest reason for suspicion from player data
+     * 
+     * @param playerData The player's data
+     * @return The latest reason, or a default message if none exists
+     */
+    private String getLatestReason(PlayerData playerData) {
+        List<String> reasons = playerData.getSuspicionReasons();
+        if (reasons == null || reasons.isEmpty()) {
+            return "Suspicious behavior";
+        }
+        return reasons.get(reasons.size() - 1);
     }
     
     /**

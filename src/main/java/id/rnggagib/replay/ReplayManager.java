@@ -13,6 +13,8 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.time.LocalDateTime;
@@ -92,11 +94,28 @@ public class ReplayManager {
     /**
      * Helper method for conditional debug logging
      * @param message The message to log
+     * @param level The debug level (0=essential, 1=important, 2=detailed)
      */
-    private void debug(String message) {
-        if (debugMode) {
+    private void debug(String message, int level) {
+        boolean logMinimal = plugin.getConfig().getBoolean("replay.log-minimal", true);
+        
+        // If log-minimal is true, only log level 0 (essential) messages
+        if (logMinimal && level > 0) {
+            return;
+        }
+        
+        // Otherwise, respect the configured debug level
+        if (debugMode && plugin.getConfig().getInt("replay.debug-level", 0) >= level) {
             plugin.getLogger().info("[ReplayDebug] " + message);
         }
+    }
+    
+    /**
+     * Helper method for conditional debug logging (default level 1)
+     * @param message The message to log
+     */
+    private void debug(String message) {
+        debug(message, 1);
     }
     
     /**
@@ -144,7 +163,7 @@ public class ReplayManager {
                 session = new ReplaySession(playerId, player.getName());
                 activeRecordings.put(playerId, session);
                 debug("Creating new replay recording session for " + player.getName() + 
-                      " (Session ID: " + session.getSessionId() + ")");
+                      " (Session ID: " + session.getSessionId() + ")", 0); // Essential log - made level 0
             }
         }
         
@@ -152,7 +171,7 @@ public class ReplayManager {
         long durationSeconds = session.getDurationSeconds();
         if (durationSeconds >= 60) {
             debug("Session already reached 60-second limit, finalizing and not adding new events for " + 
-                  player.getName() + " (Session ID: " + session.getSessionId() + ")");
+                  player.getName() + " (Session ID: " + session.getSessionId() + ")", 1);
             
             // Finalize this session if it's still active
             if (activeRecordings.containsKey(playerId)) {
@@ -165,15 +184,16 @@ public class ReplayManager {
         MiningEvent event = new MiningEvent(player, block.getLocation(), block.getType());
         session.addEvent(event);
         
+        // This is a common event that happens frequently - use detailed logging (level 2)
         debug("Recorded block break: " + block.getType() + " at " + block.getLocation().getBlockX() + 
               "," + block.getLocation().getBlockY() + "," + block.getLocation().getBlockZ() + 
-              " (Session ID: " + session.getSessionId() + ", Duration: " + session.getDurationSeconds() + "s)");
+              " (Session ID: " + session.getSessionId() + ", Duration: " + session.getDurationSeconds() + "s)", 2);
         
         // Check if this event pushed us over the 60-second limit
         // Only finalize if we've actually exceeded the limit
         if (session.getDurationSeconds() >= 60) {
             debug("Session reached 60-second limit after adding event, finalizing recording for " + 
-                  player.getName() + " (Session ID: " + session.getSessionId() + ")");
+                  player.getName() + " (Session ID: " + session.getSessionId() + ")", 1);
             finalizeRecording(playerId, "Session time limit reached", session.getSuspicionScore());
         }
     }
@@ -189,12 +209,12 @@ public class ReplayManager {
     public ReplaySession finalizeRecording(UUID playerId, String reason, int score) {
         ReplaySession session = activeRecordings.remove(playerId);
         if (session == null) {
-            debug("No active recording found to finalize for player ID: " + playerId);
+            debug("No active recording found to finalize for player ID: " + playerId, 1);
             return null;
         }
         
         if (session.getEvents().isEmpty()) {
-            debug("Skipped finalizing empty session for player ID: " + playerId);
+            debug("Skipped finalizing empty session for player ID: " + playerId, 1);
             return null;
         }
         
@@ -210,7 +230,7 @@ public class ReplayManager {
         debug("Finalized recording for player ID: " + playerId + 
               " (Session ID: " + session.getSessionId() + 
               ", Event count: " + session.getEvents().size() + 
-              ", Duration: " + session.getDurationSeconds() + "s)");
+              ", Duration: " + session.getDurationSeconds() + "s)", 0); // Essential log - made level 0
         
         // Ensure we don't exceed the max sessions per player
         List<ReplaySession> sessions = playerSessions.get(playerId);
@@ -219,7 +239,7 @@ public class ReplayManager {
             sessions.sort(Comparator.comparing(ReplaySession::getStartTime));
             ReplaySession removed = sessions.remove(0);
             debug("Removed oldest session to maintain max sessions limit for player ID: " + playerId +
-                  " (Removed session ID: " + removed.getSessionId() + ")");
+                  " (Removed session ID: " + removed.getSessionId() + ")", 1);
         }
         
         return session;
@@ -382,6 +402,7 @@ public class ReplayManager {
         private boolean isPaused = false;
         private boolean povMode = true; // Default to POV mode
         private Location lastPlayerLocation = null; // Store the last location for relative movement
+        private ItemStack[] savedInventory = null;
         
         public ReplayViewer(Player viewer, ReplaySession session) {
             this.viewer = viewer;
@@ -410,9 +431,22 @@ public class ReplayManager {
             removeEntities();
             restoreBlocks();
             
-            // Set the viewer to spectator mode for easier viewing
-            viewer.setGameMode(org.bukkit.GameMode.SPECTATOR);
+            // Save inventory and give replay control tools
+            giveReplayControlTools();
             
+            // Display information about the replay
+            viewer.sendMessage("§a[EscadiaHax] §fStarting replay of §e" + session.getPlayerName() + 
+                               "§f's mining session (Duration: §e" + session.getDurationSeconds() + "s§f)");
+            viewer.sendMessage("§a[EscadiaHax] §fUse the items in your hotbar to control the replay.");
+            
+            // Set the viewer to adventure mode initially so they can use the tools
+            viewer.setGameMode(org.bukkit.GameMode.ADVENTURE);
+            
+            // Add night vision for better visibility in dark areas
+            viewer.addPotionEffect(new org.bukkit.potion.PotionEffect(
+                org.bukkit.potion.PotionEffectType.NIGHT_VISION, 
+                20 * 60 * 10, 0, false, false));
+                
             // Get the first event and position the viewer
             MiningEvent firstEvent = session.getEvents().get(0);
             
@@ -468,6 +502,9 @@ public class ReplayManager {
             
             // Restore game mode
             viewer.setGameMode(org.bukkit.GameMode.CREATIVE);
+            
+            // Restore inventory
+            restoreInventory();
             
             viewer.sendMessage("§a[EscadiaHax] §fReplay ended.");
         }
@@ -528,13 +565,21 @@ public class ReplayManager {
                 }
             }
             
-            // Highlight the block being mined
-            highlightBlock(event);
+            // First, restore/show the block to be mined in its original form
+            restoreBlockBeforeMining(event);
             
-            // Show mining animation if not in POV mode
-            if (!povMode) {
-                showMiningAnimation(event);
-            }
+            // Then, after a delay, show the mining animation and block break
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                // Show mining animation if not in POV mode
+                if (!povMode) {
+                    showMiningAnimation(event);
+                }
+                
+                // After a short delay, highlight the block (replacing it with air to show it's been mined)
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    highlightBlock(event);
+                }, 5L); // 5 ticks (0.25 seconds) after mining animation
+            }, 10L); // 10 ticks (0.5 seconds) after block is restored
             
             // Advance to next event based on playback speed
             if (playbackSpeed >= 1.0) {
@@ -602,7 +647,7 @@ public class ReplayManager {
                     // Set position - use exact coordinates
                     spawnPacket.getDoubles()
                         .write(0, loc.getX())
-                        .write(1, loc.getY() - 0.75) // Offset Y to make armor stand appear at right height
+                        .write(1, loc.getY() - 0.25) // Adjusted offset Y to make armor stand appear at right height
                         .write(2, loc.getZ());
                     
                     // Try to set velocity to 0 if the packet supports it
@@ -615,17 +660,17 @@ public class ReplayManager {
                         }
                     } catch (Exception velocityError) {
                         // Ignore velocity errors, not critical
-                        debug("Note: Velocity fields not supported in this version");
+                        debug("Note: Velocity fields not supported in this version", 1);
                     }
                     
                     // Send the spawn packet
                     protocolManager.sendServerPacket(viewer, spawnPacket);
-                    debug("Sent spawn packet with entity ID " + entityId);
+                    debug("Sent spawn packet with entity ID " + entityId, 1);
                     
                     // Store initial location for relative movement calculations
                     lastPlayerLocation = loc.clone();
                     debug("Set lastPlayerLocation: " + lastPlayerLocation.getX() + "," + 
-                          lastPlayerLocation.getY() + "," + lastPlayerLocation.getZ());
+                          lastPlayerLocation.getY() + "," + lastPlayerLocation.getZ(), 2);
                 } catch (Exception spawnError) {
                     plugin.getLogger().severe("Error spawning entity: " + spawnError.getMessage());
                     spawnError.printStackTrace();
@@ -936,6 +981,52 @@ public class ReplayManager {
         }
         
         /**
+         * Restores a block to its original state before showing the mining animation
+         * 
+         * @param event The mining event
+         */
+        private void restoreBlockBeforeMining(MiningEvent event) {
+            Location loc = event.getLocation();
+            
+            // Don't do anything if the world doesn't exist
+            if (loc.getWorld() == null) {
+                debug("Cannot restore block: world is null", 1);
+                return;
+            }
+            
+            try {
+                // Create a block change packet
+                PacketContainer blockChange = protocolManager.createPacket(PacketType.Play.Server.BLOCK_CHANGE);
+                
+                // Set block position
+                blockChange.getBlockPositionModifier().write(0, 
+                    new com.comphenix.protocol.wrappers.BlockPosition(
+                        loc.getBlockX(), loc.getBlockY(), loc.getBlockZ()));
+                
+                // Set the block data to the original type
+                Material originalType = event.getBlockType();
+                
+                // Store original block before highlighting
+                if (!originalBlocks.containsKey(loc)) {
+                    originalBlocks.put(loc, originalType);
+                }
+                
+                // Set the block to the original material
+                blockChange.getBlockData().write(0, 
+                    com.comphenix.protocol.wrappers.WrappedBlockData.createData(originalType));
+                
+                // Send the packet
+                protocolManager.sendServerPacket(viewer, blockChange);
+                debug("Restored block at " + loc.getBlockX() + "," + loc.getBlockY() + "," + loc.getBlockZ() + 
+                      " to original type: " + originalType, 2);
+                
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error restoring block: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+        
+        /**
          * Restores all modified blocks
          */
         private void restoreBlocks() {
@@ -1112,6 +1203,36 @@ public class ReplayManager {
         }
         
         /**
+         * Toggles POV mode (first-person vs observer mode)
+         * Alias for togglePOVMode() to match the ReplayManager method
+         * 
+         * @return The new POV mode state
+         */
+        public boolean togglePOV() {
+            return togglePOVMode();
+        }
+        
+        /**
+         * Skips forward in the replay
+         * Alias for jumpForward() to match the ReplayManager method
+         * 
+         * @param seconds The number of seconds to skip forward
+         */
+        public void skipForward(int seconds) {
+            jumpForward(seconds);
+        }
+        
+        /**
+         * Skips backward in the replay
+         * Alias for jumpBackward() to match the ReplayManager method
+         * 
+         * @param seconds The number of seconds to skip backward
+         */
+        public void skipBackward(int seconds) {
+            jumpBackward(seconds);
+        }
+        
+        /**
          * Jumps forward in the replay
          * 
          * @param seconds The number of seconds to jump forward
@@ -1227,6 +1348,109 @@ public class ReplayManager {
                 viewer.sendMessage("§a[EscadiaHax] §fCannot jump backward further");
             }
         }
+        
+        /**
+         * Gives replay control tools to the player
+         */
+        private void giveReplayControlTools() {
+            // Save inventory if not already saved
+            if (savedInventory == null) {
+                savedInventory = viewer.getInventory().getContents().clone();
+            }
+            
+            ItemStack pauseItem = new ItemStack(Material.CLOCK);
+            ItemMeta pauseMeta = pauseItem.getItemMeta();
+            if (pauseMeta != null) {
+                pauseMeta.displayName(net.kyori.adventure.text.Component.text("Pause/Resume", 
+                    net.kyori.adventure.text.format.NamedTextColor.YELLOW, 
+                    net.kyori.adventure.text.format.TextDecoration.BOLD));
+                List<net.kyori.adventure.text.Component> pauseLore = new ArrayList<>();
+                pauseLore.add(net.kyori.adventure.text.Component.text("Right-click to pause/resume the replay", 
+                    net.kyori.adventure.text.format.NamedTextColor.GRAY));
+                pauseMeta.lore(pauseLore);
+                pauseItem.setItemMeta(pauseMeta);
+            }
+            
+            ItemStack forwardItem = new ItemStack(Material.SPECTRAL_ARROW);
+            ItemMeta forwardMeta = forwardItem.getItemMeta();
+            if (forwardMeta != null) {
+                forwardMeta.displayName(net.kyori.adventure.text.Component.text("Skip Forward", 
+                    net.kyori.adventure.text.format.NamedTextColor.GREEN, 
+                    net.kyori.adventure.text.format.TextDecoration.BOLD));
+                List<net.kyori.adventure.text.Component> forwardLore = new ArrayList<>();
+                forwardLore.add(net.kyori.adventure.text.Component.text("Right-click to skip forward 5 seconds", 
+                    net.kyori.adventure.text.format.NamedTextColor.GRAY));
+                forwardLore.add(net.kyori.adventure.text.Component.text("Shift-right-click to skip forward 15 seconds", 
+                    net.kyori.adventure.text.format.NamedTextColor.GRAY));
+                forwardMeta.lore(forwardLore);
+                forwardItem.setItemMeta(forwardMeta);
+            }
+            
+            ItemStack backwardItem = new ItemStack(Material.ARROW);
+            ItemMeta backwardMeta = backwardItem.getItemMeta();
+            if (backwardMeta != null) {
+                backwardMeta.displayName(net.kyori.adventure.text.Component.text("Skip Backward", 
+                    net.kyori.adventure.text.format.NamedTextColor.RED, 
+                    net.kyori.adventure.text.format.TextDecoration.BOLD));
+                List<net.kyori.adventure.text.Component> backwardLore = new ArrayList<>();
+                backwardLore.add(net.kyori.adventure.text.Component.text("Right-click to skip backward 5 seconds", 
+                    net.kyori.adventure.text.format.NamedTextColor.GRAY));
+                backwardLore.add(net.kyori.adventure.text.Component.text("Shift-right-click to skip backward 15 seconds", 
+                    net.kyori.adventure.text.format.NamedTextColor.GRAY));
+                backwardMeta.lore(backwardLore);
+                backwardItem.setItemMeta(backwardMeta);
+            }
+            
+            ItemStack povItem = new ItemStack(Material.ENDER_EYE);
+            ItemMeta povMeta = povItem.getItemMeta();
+            if (povMeta != null) {
+                povMeta.displayName(net.kyori.adventure.text.Component.text("Toggle POV", 
+                    net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE, 
+                    net.kyori.adventure.text.format.TextDecoration.BOLD));
+                List<net.kyori.adventure.text.Component> povLore = new ArrayList<>();
+                povLore.add(net.kyori.adventure.text.Component.text("Right-click to toggle between", 
+                    net.kyori.adventure.text.format.NamedTextColor.GRAY));
+                povLore.add(net.kyori.adventure.text.Component.text("POV mode and observer mode", 
+                    net.kyori.adventure.text.format.NamedTextColor.GRAY));
+                povMeta.lore(povLore);
+                povItem.setItemMeta(povMeta);
+            }
+            
+            ItemStack exitItem = new ItemStack(Material.BARRIER);
+            ItemMeta exitMeta = exitItem.getItemMeta();
+            if (exitMeta != null) {
+                exitMeta.displayName(net.kyori.adventure.text.Component.text("Exit Replay", 
+                    net.kyori.adventure.text.format.NamedTextColor.DARK_RED, 
+                    net.kyori.adventure.text.format.TextDecoration.BOLD));
+                List<net.kyori.adventure.text.Component> exitLore = new ArrayList<>();
+                exitLore.add(net.kyori.adventure.text.Component.text("Right-click to exit the replay", 
+                    net.kyori.adventure.text.format.NamedTextColor.GRAY));
+                exitMeta.lore(exitLore);
+                exitItem.setItemMeta(exitMeta);
+            }
+            
+            // Give the items to the player
+            viewer.getInventory().clear();
+            viewer.getInventory().setItem(0, pauseItem);
+            viewer.getInventory().setItem(1, backwardItem);
+            viewer.getInventory().setItem(2, forwardItem);
+            viewer.getInventory().setItem(7, povItem);
+            viewer.getInventory().setItem(8, exitItem);
+            
+            viewer.updateInventory();
+        }
+        
+        /**
+         * Restores the player's saved inventory
+         */
+        private void restoreInventory() {
+            if (savedInventory != null) {
+                viewer.getInventory().setContents(savedInventory);
+                viewer.updateInventory();
+                savedInventory = null;
+                debug("Restored inventory for " + viewer.getName(), 1);
+            }
+        }
     }
     
     /**
@@ -1323,6 +1547,56 @@ public class ReplayManager {
      */
     public boolean isViewing(UUID playerId) {
         return activeViewers.containsKey(playerId);
+    }
+    
+    /**
+     * Checks if a player is currently viewing a replay
+     * 
+     * @param player The player to check
+     * @return True if the player is viewing a replay
+     */
+    public boolean isViewingReplay(Player player) {
+        return activeViewers.containsKey(player.getUniqueId());
+    }
+    
+    /**
+     * Toggle between first-person and observer mode for a replay viewer
+     * 
+     * @param viewer The player viewing the replay
+     * @return True if now in POV mode, false if in observer mode
+     */
+    public boolean togglePOV(Player viewer) {
+        ReplayViewer replayViewer = activeViewers.get(viewer.getUniqueId());
+        if (replayViewer != null) {
+            return replayViewer.togglePOV();
+        }
+        return false;
+    }
+    
+    /**
+     * Skip forward in the replay
+     * 
+     * @param viewer The player viewing the replay
+     * @param seconds Number of seconds to skip forward
+     */
+    public void skipForward(Player viewer, int seconds) {
+        ReplayViewer replayViewer = activeViewers.get(viewer.getUniqueId());
+        if (replayViewer != null) {
+            replayViewer.skipForward(seconds);
+        }
+    }
+    
+    /**
+     * Skip backward in the replay
+     * 
+     * @param viewer The player viewing the replay
+     * @param seconds Number of seconds to skip backward
+     */
+    public void skipBackward(Player viewer, int seconds) {
+        ReplayViewer replayViewer = activeViewers.get(viewer.getUniqueId());
+        if (replayViewer != null) {
+            replayViewer.skipBackward(seconds);
+        }
     }
     
     /**

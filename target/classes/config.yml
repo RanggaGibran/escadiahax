@@ -13,6 +13,16 @@ xray-detection:
     impossible-enchants: 10
     direct-mining: 15
     unnatural-speed: 15
+  # Debug settings
+  debug:
+    # Enable detailed logging for detection decisions
+    detailed-logging: false
+    # Debug level (0=off, 1=important only, 2=detailed)
+    debug-level: 0
+    # Only log high suspicion scores
+    log-only-high-suspicion: true
+    # Minimum suspicion score to log (if log-only-high-suspicion is true)
+    min-score-to-log: 40
   # Advanced detection settings
   advanced:
     # Allow higher ratios of valuable ores when mining in natural caves (Y level below this is considered a cave)
@@ -97,7 +107,11 @@ replay:
   # Storage time for replay data in minutes (after this time, old data will be purged)
   storage-time: 60
   # Enable debug logging for replay functionality
-  debug-mode: true
+  debug-mode: false
+  # Debug level (0=off, 1=important only, 2=detailed)
+  debug-level: 0
+  # Only log important replay events (session start/end)
+  log-minimal: true
   # Blocks to highlight in replay mode
   highlight-blocks:
     - DIAMOND_ORE

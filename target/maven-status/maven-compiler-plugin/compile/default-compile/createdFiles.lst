@@ -1,4 +1,6 @@
 id\rnggagib\gui\SusGUI.class
+id\rnggagib\listeners\ReplayControlListener.class
+id\rnggagib\listeners\ReplayControlListener$1.class
 id\rnggagib\replay\MiningEvent.class
 id\rnggagib\manager\ConfigManager.class
 id\rnggagib\listeners\BlockBreakListener.class
