@@ -45,12 +45,17 @@ public class Plugin extends JavaPlugin {
         this.vanishManager = new VanishManager(this);
         this.susGUI = new SusGUI(this);
         
-        // Initialize replay manager if ProtocolLib is present
-        if (getServer().getPluginManager().getPlugin("ProtocolLib") != null) {
+        // Initialize replay manager if ProtocolLib is present AND replay is enabled in config
+        boolean replayEnabled = getConfig().getBoolean("replay.enabled", false);
+        if (replayEnabled && getServer().getPluginManager().getPlugin("ProtocolLib") != null) {
             this.replayManager = new ReplayManager(this);
-            LOGGER.info("ProtocolLib found, replay functionality enabled!");
+            LOGGER.info("ProtocolLib found and replay is enabled in config, replay functionality enabled!");
         } else {
-            LOGGER.warning("ProtocolLib not found, replay functionality disabled!");
+            if (!replayEnabled) {
+                LOGGER.info("Replay functionality disabled in config.");
+            } else {
+                LOGGER.warning("ProtocolLib not found, replay functionality disabled!");
+            }
         }
         
         // Register listeners

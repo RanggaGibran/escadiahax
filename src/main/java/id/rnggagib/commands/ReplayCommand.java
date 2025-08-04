@@ -348,57 +348,71 @@ public class ReplayCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();
         
-        if (args.length == 1) {
-            completions.add("list");
-            completions.add("view");
-            completions.add("stop");
-            completions.add("control");
-            completions.add("help");
-        } else if (args.length == 2) {
-            switch (args[0].toLowerCase()) {
-                case "list":
-                    completions.add("all");
-                    for (Player player : Bukkit.getOnlinePlayers()) {
-                        completions.add(player.getName());
-                    }
-                    break;
-                    
-                case "control":
-                    completions.add("pause");
-                    completions.add("pov");
-                    completions.add("speed");
-                    completions.add("forward");
-                    completions.add("backward");
-                    break;
-                    
-                case "view":
-                    // Add session IDs
-                    for (List<ReplaySession> sessions : plugin.getReplayManager().getAllSessions().values()) {
-                        for (ReplaySession session : sessions) {
-                            completions.add(session.getSessionId().toString().substring(0, 8));
-                        }
-                    }
-                    break;
+        try {
+            if (!sender.hasPermission("escadiahax.replay")) {
+                return completions;
             }
-        } else if (args.length == 3) {
-            if (args[0].toLowerCase().equals("control")) {
-                switch (args[1].toLowerCase()) {
-                    case "speed":
-                        completions.add("0.5");
-                        completions.add("1.0");
-                        completions.add("2.0");
-                        completions.add("5.0");
+            
+            if (!plugin.isReplayEnabled()) {
+                return completions;
+            }
+            
+            if (args.length == 1) {
+                completions.add("list");
+                completions.add("view");
+                completions.add("stop");
+                completions.add("control");
+                completions.add("help");
+            } else if (args.length == 2) {
+                switch (args[0].toLowerCase()) {
+                    case "list":
+                        completions.add("all");
+                        for (Player player : Bukkit.getOnlinePlayers()) {
+                            completions.add(player.getName());
+                        }
                         break;
                         
-                    case "forward":
-                    case "backward":
-                        completions.add("5");
-                        completions.add("10");
-                        completions.add("30");
-                        completions.add("60");
+                    case "control":
+                        completions.add("pause");
+                        completions.add("pov");
+                        completions.add("speed");
+                        completions.add("forward");
+                        completions.add("backward");
+                        break;
+                        
+                    case "view":
+                        // Add player names instead of session IDs for safety
+                        for (Player player : Bukkit.getOnlinePlayers()) {
+                            completions.add(player.getName());
+                        }
                         break;
                 }
+            } else if (args.length == 3) {
+                if (args[0].toLowerCase().equals("control")) {
+                    switch (args[1].toLowerCase()) {
+                        case "speed":
+                            completions.add("0.5");
+                            completions.add("1.0");
+                            completions.add("2.0");
+                            break;
+                            
+                        case "forward":
+                        case "backward":
+                            completions.add("5");
+                            completions.add("10");
+                            completions.add("30");
+                            break;
+                    }
+                }
             }
+            
+            // Filter based on the current input
+            if (args.length > 0) {
+                String lastArg = args[args.length - 1].toLowerCase();
+                completions.removeIf(s -> !s.toLowerCase().startsWith(lastArg));
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("Error in tab completion: " + e.getMessage());
         }
         
         return completions;

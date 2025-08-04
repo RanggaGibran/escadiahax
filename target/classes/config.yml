@@ -99,7 +99,7 @@ vanish:
 # Replay mode settings
 replay:
   # Enable or disable replay functionality
-  enabled: true
+  enabled: false
   # Maximum duration of a replay in seconds (strictly enforced)
   max-duration: 60
   # Number of mining sessions to record per player
